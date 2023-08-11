@@ -1,0 +1,318 @@
+;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
+
+;; Place your private configuration here! Remember, you do not need to run 'doom
+;; sync' after modifying this file!
+
+;; Some functionality uses this to identify you, e.g. GPG configuration, email
+;; clients, file templates and snippets. It is optional.
+(setq user-full-name "{{- onepasswordRead "op://Personal/PrimaryID/full-name" -}}"
+      user-mail-address "{{- onepasswordRead "op://Personal/PrimaryID/email" -}}")
+
+;; Doom exposes five (optional) variables for controlling fonts in Doom:
+;;
+;; - `doom-variable-pitch-font' -- a non-monospace font (where applicable)
+;; - `doom-big-font' -- used for `doom-big-font-mode'; use this for
+;; - `doom-font' -- the primary font to use
+;;   presentations or streaming.
+;; - `doom-unicode-font' -- for unicode glyphs
+;; - `doom-serif-font' -- for the `fixed-pitch-serif' face
+;;
+;; See 'C-h v doom-font' for documentation and more examples of what they
+;; accept. For example:
+;;
+;; (setq doom-font (font-spec :family "Fira Sans" :size 15 :weight 'semi-light)
+;;      doom-variable-pitch-font (font-spec :family "Fira Sans" :size 16))
+(setq doom-font (font-spec :family "Iosevka Term" :size 20 :weight 'semi-light))
+
+;; If you or Emacs can't find your font, use 'M-x describe-font' to look them
+;; up, `M-x eval-region' to execute elisp code, and 'M-x doom/reload-font' to
+;; refresh your font settings. If Emacs still can't find your font, it likely
+;; wasn't installed correctly. Font issues are rarely Doom issues!
+
+;; There are two ways to load a theme. Both assume the theme is installed and
+;; available. You can either set `doom-theme' or manually load a theme with the
+;; `load-theme' function. This is the default:
+;; (doom-theme 'doom-old-hope)
+(load-theme 'gruvbox-light-hard t)
+
+;; This determines the style of line numbers in effect. If set to `nil', line
+;; numbers are disabled. For relative line numbers, set this to `relative'.
+(setq display-line-numbers-type t)
+
+;; If you use `org' and don't want your org files in the default location below,
+;; change `org-directory'. It must be set before org loads!
+(setq org-directory "~/Documents/org-files")
+
+;; Whenever you reconfigure a package, make sure to wrap your config in an
+;; `after!' block, otherwise Doom's defaults may override your settings. E.g.
+;;
+;;   (after! PACKAGE
+;;     (setq x y))
+;;
+;; The exceptions to this rule:
+;;
+;;   - Setting file/directory variables (like `org-directory')
+;;   - Setting variables which explicitly tell you to set them before their
+;;     package is loaded (see 'C-h v VARIABLE' to look up their documentation).
+;;   - Setting doom variables (which start with 'doom-' or '+').
+;;
+;; Here are some additional functions/macros that will help you configure Doom.
+;;
+;; - `load!' for loading external *.el files relative to this one
+;; - `use-package!' for configuring packages
+;; - `after!' for running code after a package has loaded
+;; - `add-load-path!' for adding directories to the `load-path', relative to
+;;   this file. Emacs searches the `load-path' when you load packages with
+;;   `require' or `use-package'.
+;; - `map!' for binding new keys
+;;
+;; To get information about any of these functions/macros, move the cursor over
+;; the highlighted symbol at press 'K' (non-evil users must press 'C-c c k').
+;; This will open documentation for it, including demos of how they are used.
+;; Alternatively, use `C-h o' to look up a symbol (functions, variables, faces,
+;; etc).
+;;
+;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
+;; they are implemented.
+
+
+;; gcal variables
+(setq google-calendar-client-id "{{- onepasswordRead "op://gcal/clientid/credential" -}}"
+      google-calendar-client-secret "{{- onepasswordRead "op://gcal/clientsecret/credential" -}}")
+
+
+;; Rust LSP set up
+(after! rustic
+  (setq rustic-lsp-server 'rls))
+
+
+;; Org Roam set up
+(setq org-roam-directory "~/Documents/org-roam")
+
+
+;; Capture Templates
+;;(after! org
+;;  (let ((default-directory "~/Documents/org-files/"))
+;;    (setq org-capture-templates
+;;        '(("t" "Capture TODO to Inbox" entry (file "~/Documents/org-files/gtd/inbox.org")
+;;           "* TODO %?\n %i\n")))))
+(after! org
+  (setq org-capture-templates
+        '(("i" "Capture to Inbox" entry (file "inbox.org")
+           "* %?\n %i\n")))
+  (setq org-log-into-drawer t))
+
+
+;; Roam Config
+(after! org-roam
+  (setq org-roam-capture-templates
+      '(
+        ("r" "literature" plain "%?"
+         :if-new (file+head "literature/${title}.org"
+                            "#+title: ${title}\n")
+         :immediate-finish t
+         :unnarrowed t)
+        ("a" "reference" plain "%?"
+         :if-new (file+head "reference/${title}.org"
+                            "#+title: ${title}\n")
+         :immediate-finish t
+         :unnarrowed t)
+        ("s" "concept" plain "%?"
+         :if-new (file+head "concept/${title}.org"
+                            "#+title: ${title}\n"))))
+
+  (cl-defmethod org-roam-node-type ((node org-roam-node))
+    "Return the TYPE of NODE."
+    (condition-case nil
+        (file-name-nondirectory
+         (directory-file-name
+          (file-name-directory
+           (file-relative-name (org-roam-node-file node) org-roam-directory))))
+      (error "")))
+
+  (setq org-roam-node-display-template
+      (concat "${type:15} ${title:*} " (propertize "${tags:10}" 'face 'org-tag)))
+
+  (setq org-roam-mode-sections
+      (list #'org-roam-backlinks-section
+            #'org-roam-reflinks-section
+            #'org-roam-unlinked-references-section))
+
+  (use-package! websocket
+    :after org-roam)
+
+  (use-package! org-roam-ui
+    :after org ;; or :after org
+    ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
+    ;;         a hookable mode anymore, you're advised to pick something yourself
+    ;;         if you don't care about startup time, use
+    ;;  :hook (after-init . org-roam-ui-mode)
+    :config
+    (setq org-roam-ui-sync-theme t
+          org-roam-ui-follow t
+          org-roam-ui-update-on-save t
+          org-roam-ui-open-on-start t)))
+
+
+;; Citar Setup
+(setq citar-bibliography '("~/Documents/org-roam/biblio.bib"))
+
+
+;; Custom Doom-type Bindings
+(after! org
+  (map! :leader
+      (:prefix-map ("r" . "org-roam")
+                   (:prefix ("c" . "capture")
+                    :desc "Capture to Node" "n" #'org-roam-capture
+                    :desc "Capture Dailies Date" "d" #'org-roam-dailies-capture-date
+                    :desc "Capture Dalies Today" "t" #'org-roam-dailies-capture-today
+                    :desc "Capture Dalies Tomorrow" "T" #'org-roam-dailies-capture-tomorrow
+                    :desc "Capture Dalies Yesterday" "y" #'org-roam-dailies-capture-yesterday))
+      (:prefix-map ("g" . "gtd")
+                   (:prefix ("f" . "files")
+                    ;;:desc "Open GTD Inbox" "i" #'(lambda () (interactive) (find-file-other-window "~/Documents/org-files/gtd/inbox.org"))
+                    :desc "Open GTD Inbox" "i" #'(lambda () (interactive) (find-file-other-window (expand-file-name "inbox.org" org-directory)))
+                    :desc "Open GTD Someday Box" "s" #'(lambda () (interactive) (find-file-other-window (expand-file-name "someday.org" org-directory)))
+                    :desc "Open GTD Box" "g" #'(lambda () (interactive) (find-file-other-window (expand-file-name "GTD.org" org-directory)))
+                    :desc "Open GCal" "c" #'(lambda() (interactive) (find-file-other-window (expand-file-name "gcal.org" org-directory)))))
+      (:prefix-map ("c". "citar")
+                   (:desc "Insert Citar Citation" "i" #'citar-insert-citation)
+                   (:desc "Insert Citar Preset" "p" #'citar-insert-preset))))
+
+
+;; Agenda Config
+(after! org
+  (setq org-columns-default-format "%60ITEM(Task) %TODO %6Effort(Estim){:} %6CLOCKSUM(Clock) % TAGS"
+        org-agenda-prefix-format '((agenda . " %i %-12:c%-12t%-6e% s")
+                                   (todo . " %i %-12:c %-6e")
+                                   (tags . " %i %-12:c")
+                                   (search . " %i %-12:c")))
+
+  (setq org-agenda-show-future-repeats nil
+        org-agenda-skip-scheduled-if-done t
+        org-agenda-skip-deadline-if-done t
+        org-agenda-block-separator 9477
+        org-agenda-compact-blocks nil
+        org-agenda-skip-deadline-prewarning-if-scheduled t
+        org-use-property-inheritance t)
+
+  (setq org-agenda-custom-commands
+        '(("c" . "Custom Views")
+          ("cw" "Class Weeks"
+                ((org-ql-block '(property "WEEK")))
+                ((org-super-agenda-groups nil)))
+          ("ct" "Today At A Glance"
+                ((org-ql-block '(and (or (todo "TODO")
+                                         (todo "STRT"))
+                                     (not (tags "project"))
+                                     (deadline 0))
+                               ((org-ql-block-header (upcase "Due Today"))))
+                 (org-ql-block '(and (or (todo "TODO")
+                                         (todo "STRT"))
+                                     (not (tags "project"))
+                                     (scheduled 0))
+                               ((org-ql-block-header (upcase "Scheduled Today")))))
+                ((org-super-agenda-groups '((:auto-outline-path t)))))
+          ("cg" "GTD"
+                ((org-ql-block '(todo "IDEA")
+                               ((org-ql-block-header "GTD"))))
+                ((org-super-agenda-groups '((:auto-outline-path t)))))
+          ("cp" "Projects"
+                ((org-ql-block '(and (tags "project")
+                                     (or (todo "PROJ")
+                                         (todo "TODO")))
+                               ((org-ql-block-header (upcase "Projects")))
+                               ((org-super-agenda-groups '((:auto-outline-path t))))))
+                ((org-super-agenda-groups '((:auto-outline-path t))))))))
+
+
+;; Super Agenda Setup
+(after! org
+  (setq org-super-agenda-groups
+        '((:log t)  ; Automatically named "Log"
+         (:name "Schedule"
+                :time-grid t)
+         (:name "Today"
+                :scheduled today)
+         (:habit t)
+         (:name "Due today"
+                :deadline today)
+         (:name "Overdue"
+                :deadline past)
+         (:name "Due soon"
+                :deadline future)
+         (:name "Unimportant"
+                :todo ("SOMEDAY" "MAYBE" "CHECK" "TO-READ" "TO-WATCH")
+                :order 100)
+         (:name "Waiting..."
+                :todo "WAITING"
+                :order 98)
+         (:name "Scheduled earlier"
+                :scheduled past)))
+  (org-agenda-list))
+
+
+;;; Doom Dashboard Config
+;; Sets splash screen to png
+;;(setq fancy-splash-image (expand-file-name "misc/splash-images/pain_splash_push.png" doom-user-dir))
+;;(remove-hook '+doom-dashboard-functions #'doom-dashboard-widget-shortmenu)
+;;(add-hook! '+doom-dashboard-functions :append
+;;  (insert "\n" (+doom-dashboard--center +doom-dashboard--width "This hatred binds us together")))
+;;
+;; Sets splash screen to ASCII banner
+(defun blink-works ()
+  (let* ((banner '(
+                   "▄▄▄▄▄▄▄ ▄▄▄     ▄▄▄ ▄▄    ▄ ▄▄▄   ▄ ▄     ▄ ▄▄▄▄▄▄▄ ▄▄▄▄▄▄   ▄▄▄   ▄ ▄▄▄▄▄▄▄"
+                   "█  ▄    █   █   █   █  █  █ █   █ █ █ █ ▄ █ █       █   ▄  █ █   █ █ █       █"
+                   "█ █▄█   █   █   █   █   █▄█ █   █▄█ █ ██ ██ █   ▄   █  █ █ █ █   █▄█ █  ▄▄▄▄▄█"
+                   "█       █   █   █   █       █      ▄█       █  █ █  █   █▄▄█▄█      ▄█ █▄▄▄▄▄"
+                   "█  ▄   ██   █▄▄▄█   █  ▄    █     █▄█       █  █▄█  █    ▄▄  █     █▄█▄▄▄▄▄  █"
+                   "█ █▄█   █       █   █ █ █   █    ▄  █   ▄   █       █   █  █ █    ▄  █▄▄▄▄▄█ █"
+                   "█▄▄▄▄▄▄▄█▄▄▄▄▄▄▄█▄▄▄█▄█  █▄▄█▄▄▄█ █▄█▄▄█ █▄▄█▄▄▄▄▄▄▄█▄▄▄█  █▄█▄▄▄█ █▄█▄▄▄▄▄▄▄█"
+                   ))
+         (longest-line (apply #'max (mapcar #'length banner))))
+    (put-text-property
+     (point)
+     (dolist (line banner (point))
+       (insert (+doom-dashboard--center
+                +doom-dashboard--width
+                (concat line (make-string (max 0 (- longest-line (length line))) 32)))
+               "\n"))
+     'face 'doom-dashboard-banner)))
+
+(setq +doom-dashboard-ascii-banner-fn #'blink-works)
+(remove-hook '+doom-dashboard-functions #'doom-dashboard-widget-shortmenu)
+
+
+;; Org Babel Config
+;; active Org-babel languages
+(after! org-babel
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '(;; other Babel languages
+        (plantuml . t))))
+(setq org-plantuml-jar-path
+      (expand-file-name "~/.doom.d/misc/platinuml-jar/plantuml.jar"))
+
+
+;;; Custom Commands
+;; Light/Dark Switcher
+;; TODO FINISH THIS
+(setq dark-theme 'gruvbox-dark-hard)
+(setq light-theme 'gruvbox-light-hard)
+(setq current-theme dark-theme)
+(defun switch-theme-moude ()
+    "Toggle between dark-theme and light-theme."
+  (interactive)
+
+  )
+
+;;; gcal setup
+(after! org-gcal
+  (setq org-gcal-client-id 'google-calendar-client-id
+        org-gcal-client-secret 'google-calendar-client-secret
+        org-gcal-file-alist '(("seanbdcastillo@gmail.com" . "~/Documents/org-files/gcal.org"))
+        plstore-cache-passphrase-for-symmetric-encryption t))
+
+(provide 'config)
+;;; config.el ends here
